@@ -18,6 +18,7 @@ import kotlin.coroutines.CoroutineContext
 
 class MainActivity : AppCompatActivity(), CoroutineScope {
     private var job: Job = Job()
+    private var flag: Boolean = true
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Main + job // Изменение на главный поток
 
@@ -29,19 +30,54 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        val buttonGenerate = findViewById<Button>(R.id.button2)
         val buttonCalculate = findViewById<Button>(R.id.button)
         buttonCalculate.setOnClickListener {
             launch {
                 val loadingProgressBar = findViewById<ProgressBar>(R.id.progressBar)
+                flag = false
                 loadingProgressBar.visibility = View.VISIBLE // Обновление UI в главном потоке
-                calculateHash()
+                calculateHash(flag)
                 loadingProgressBar.visibility = View.INVISIBLE // Обновление UI в главном потоке
+            }
+        }
+        buttonGenerate.setOnClickListener {
+            launch {
+                val loadingProgressBar = findViewById<ProgressBar>(R.id.progressBar)
+                flag = true
+                loadingProgressBar.visibility = View.VISIBLE
+                calculateHash(flag)
+                loadingProgressBar.visibility = View.INVISIBLE
             }
         }
     }
 
-    suspend fun calculateHash() {
+    suspend fun calculateHash(_flag: Boolean) {
+        if(_flag == false){
+            val enter: EditText = findViewById(R.id.editTextNumber)
+            val num = enter.text.toString().toInt()
+            val array = byteArrayOf(num.toByte())
+            val result = crc16(array)
+            withContext(Dispatchers.Main) {
+                val tv: TextView = findViewById(R.id.textView)
+                val resultHex = result.toHex()
+                Log.d("Hue","${result.joinToString("")}")
+                tv.setText("$resultHex")
+            }
+        }
+        else{
+            val randomData = generateRandomData()
+            val result = crc16(randomData)
+            withContext(Dispatchers.Main){
+                val tv:TextView = findViewById(R.id.textView)
+                val resultHex = result.toHex()
+                Log.d("Hue","${result.joinToString(",")}")
+                tv.setText("$resultHex")
+            }
+        }
+
+    }
+    /*suspend fun calculateHash(_flag: Boolean) {
         val enter: EditText = findViewById(R.id.editTextNumber)
         val num = enter.text.toString().toInt()
         val array = byteArrayOf(num.toByte())
@@ -51,8 +87,13 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
             val resultHex = result.toHex()
             val resultString = result.joinToString(",")
             Log.d("Hue","$resultString")
-            tv.setText("$resultHex; $resultString")
+            tv.setText("$resultHex")
         }
+    }*/
+
+    fun generateRandomData(): ByteArray {
+        val dataSize = 16777216 // Размер данных в байтах (16 МБ)
+        return ByteArray(dataSize) { _ -> (0..255).random().toByte() }
     }
 
     suspend fun crc16(byteArray: ByteArray): ByteArray {
@@ -65,7 +106,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
             crc = crc xor (((crc and 0xff) shl 5) and 0xffff)
         }
         crc = crc and 0xffff
-        delay(2500)
+        delay(1000)
         Log.d("Hue","${crc}")
         return crc.to2ByteArray()
     }
